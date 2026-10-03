@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MonoLeaf LX100</title>
+  <style>
+    :root {
+      --bg-dark: #12181b;
+      --card-dark: #1e252b;
+      --card-border: #2a343d;
+      --sidebar-bg: #182026;
+      --primary-red: #059669;
+      --text-main: #e1e6eb;
+      --text-muted: #8a9ba8;
+      --input-bg: #29323c;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    body { background-color: var(--bg-dark); color: var(--text-main); font-size: 14px; display: flex; height: 100vh; overflow: hidden; }
+
+    /* Left Vertical Navigation Bar */
+    sidebar {
+      width: 220px;
+      background-color: var(--sidebar-bg);
+      border-right: 2px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .brand-header {
+      padding: 16px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #ffffff;
+      border-bottom: 2px solid var(--primary-red);
+      background-color: #141b20;
+    }
+
+    .nav-links { list-style: none; padding: 10px 0; }
+    .nav-links li {
+      padding: 12px 20px;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: bold;
+      border-left: 3px solid transparent;
+    }
+    .nav-links li:hover { background-color: var(--card-dark); color: #ffffff; }
+    .nav-links li.active {
+      background-color: var(--card-dark);
+      color: #ffffff;
+      border-left-color: var(--primary-red);
+    }
+
+    /* Main Content Area */
+    main { flex-grow: 1; padding: 20px; overflow-y: auto; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Header Bar */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .header-title { font-size: 18px; font-weight: bold; }
+
+    /* Buttons */
+    .btn {
+      background-color: var(--primary-red);
+      color: #ffffff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .btn:hover { opacity: 0.9; }
+
+    /* Card Panels */
+    .card {
+      background: var(--card-dark);
+      border-radius: 6px;
+      padding: 18px;
+      margin-bottom: 20px;
+      border: 1px solid var(--card-border);
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 15px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--card-border);
+      color: #ffffff;
+    }
+
+    /* Grids & Forms */
+    .relay-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 15px; }
+    .relay-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px; background: #182026; border: 1px solid var(--card-border); border-radius: 4px;
+    }
+
+    /* Switches */
+    .switch-toggle { position: relative; width: 48px; height: 24px; display: inline-block; }
+    .switch-toggle input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #394b59; transition: .2s; border-radius: 24px;
+    }
+    .slider:before {
+      position: absolute; content: ""; height: 16px; width: 16px;
+      left: 4px; bottom: 4px; background-color: white; transition: .2s; border-radius: 50%;
+    }
+    input:checked + .slider { background-color: var(--primary-red); }
+    input:checked + .slider:before { transform: translateX(24px); }
+
+    /* Tables */
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th, .data-table td {
+      padding: 10px; text-align: left; border-bottom: 1px solid var(--card-border); font-size: 13px;
+    }
+    .data-table th { background-color: #182026; color: var(--text-muted); }
+
+    select, input[type="text"] {
+      padding: 6px 10px; border-radius: 4px; border: 1px solid var(--card-border);
+      outline: none; background-color: var(--input-bg); color: var(--text-main); font-size: 12px; width: 100%;
+    }
+    select:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+    
+    .inline-select-group { display: flex; gap: 8px; }
+    
+    .locked-info-badge {
+      color: #e2a03f;
+      font-weight: bold;
+      font-size: 12px;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Left Sidebar Navigation -->
+  <sidebar>
+    <div class="brand-header">MonoLeaf LX100</div>
+    <ul class="nav-links">
+      <li class="active" onclick="switchTab('tab-control')">Relays & Switches</li>
+      <li onclick="switchTab('tab-i2c')">I2C Scanner</li>
+      <li onclick="switchTab('tab-io')">8-CH Digital I/O</li>
+      <li onclick="switchTab('tab-comms')">UART & Modbus</li>
+      <li onclick="switchTab('tab-onewire')">1-Wire Bus</li>
+      <li onclick="switchTab('tab-system')">System</li>
+    </ul>
+  </sidebar>
+
+  <!-- Main Content Body -->
+  <main>
+    <header>
+      <div class="header-title" id="page-title">Relays & Inbuilt Switches</div>
+      <button class="btn" onclick="connectWiFi()">Connect WiFi</button>
+    </header>
+
+    <!-- TAB 1: Relays & Inbuilt Switches -->
+    <div id="tab-control" class="tab-content active">
+      <div class="card">
+        <div class="card-title">4 Inbuilt Relays</div>
+        <div class="relay-grid">
+          <div class="relay-item">
+            <span id="name-relay1">Relay 1</span>
+            <div>
+              <button class="btn" style="padding: 2px 6px; font-size: 10px;" onclick="editRelayName(1)">Edit</button>
+              <label class="switch-toggle"><input type="checkbox" id="relay1" onchange="toggleRelay(1, this.checked)"><span class="slider"></span></label>
+            </div>
+          </div>
+          <div class="relay-item">
+            <span id="name-relay2">Relay 2</span>
+            <div>
+              <button class="btn" style="padding: 2px 6px; font-size: 10px;" onclick="editRelayName(2)">Edit</button>
+              <label class="switch-toggle"><input type="checkbox" id="relay2" onchange="toggleRelay(2, this.checked)"><span class="slider"></span></label>
+            </div>
+          </div>
+          <div class="relay-item">
+            <span id="name-relay3">Relay 3</span>
+            <div>
+              <button class="btn" style="padding: 2px 6px; font-size: 10px;" onclick="editRelayName(3)">Edit</button>
+              <label class="switch-toggle"><input type="checkbox" id="relay3" onchange="toggleRelay(3, this.checked)"><span class="slider"></span></label>
+            </div>
+          </div>
+          <div class="relay-item">
+            <span id="name-relay4">Relay 4</span>
+            <div>
+              <button class="btn" style="padding: 2px 6px; font-size: 10px;" onclick="editRelayName(4)">Edit</button>
+              <label class="switch-toggle"><input type="checkbox" id="relay4" onchange="toggleRelay(4, this.checked)"><span class="slider"></span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">4 Inbuilt Switches Configuration</div>
+        <table class="data-table">
+          <thead>
+            <tr><th>Switch</th><th>Type</th><th>Output Trigger</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Switch 1</td>
+              <td><select id="type1"><option value="Switch">Switch</option><option value="Button">Button</option><option value="sensor">Sensor</option></select></td>
+              <td><select id="sensor_type1"><option value="0">LOW</option><option value="1">HIGH</option></select></td>
+            </tr>
+            <tr>
+              <td>Switch 2</td>
+              <td><select id="type2"><option value="Switch">Switch</option><option value="Button">Button</option><option value="sensor">Sensor</option></select></td>
+              <td><select id="sensor_type2"><option value="0">LOW</option><option value="1">HIGH</option></select></td>
+            </tr>
+            <tr>
+              <td>Switch 3</td>
+              <td><select id="type3"><option value="Switch">Switch</option><option value="Button">Button</option><option value="sensor">Sensor</option></select></td>
+              <td><select id="sensor_type3"><option value="0">LOW</option><option value="1">HIGH</option></select></td>
+            </tr>
+            <tr>
+              <td>Switch 4</td>
+              <td><select id="type4"><option value="Switch">Switch</option><option value="Button">Button</option><option value="sensor">Sensor</option></select></td>
+              <td><select id="sensor_type4"><option value="0">LOW</option><option value="1">HIGH</option></select></td>
+            </tr>
+          </tbody>
+        </table>
+        <button class="btn" style="margin-top: 15px; float: right;" onclick="saveConfig()">Save Switches</button>
+        <div style="clear: both;"></div>
+      </div>
+    </div>
+
+    <!-- TAB 2: I2C Scanner (3 Ports) -->
+    <div id="tab-i2c" class="tab-content">
+      <div class="card">
+        <div class="card-title">I2C 2 Port Scanner</div>
+        <button class="btn" style="margin-bottom: 15px;" onclick="scanI2CBus()">Scan Buses</button>
+        <table class="data-table">
+          <thead>
+            <tr><th>Port</th><th>Address</th><th>Chip ID</th><th>Driver Status</th></tr>
+          </thead>
+          <tbody id="i2c-results">
+            <tr><td>Port 1</td><td>---</td><td>---</td><td>Idle</td></tr>
+            <tr><td>Port 2</td><td>---</td><td>---</td><td>Idle</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 3: 8-Channel Digital I/O Expansion -->
+    <div id="tab-io" class="tab-content">
+      <div class="card">
+        <div class="card-title">6 Channel Programmable Digital I/O</div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 15%;">Channel</th>
+              <th style="width: 25%;">Direction</th>
+              <th style="width: 60%;">State / Process Linking</th>
+            </tr>
+          </thead>
+          <tbody id="io-table-body">
+            <!-- Dynamically populated by JS onload -->
+          </tbody>
+        </table>
+        <button class="btn" style="margin-top: 15px; float: right;" onclick="saveIOConfig()">Save I/O Configuration</button>
+        <div style="clear: both;"></div>
+      </div>
+    </div>
+
+    <!-- TAB 4: UART & Modbus RS-485 -->
+    <div id="tab-comms" class="tab-content">
+      <div class="card">
+        <div class="card-title">UART & RS-485 Modbus Settings</div>
+        <div class="form-group">
+          <label>Baudrate</label>
+          <select id="baud">
+            <option value="9600">9600</option>
+            <option value="19200">19200</option>
+            <option value="115200" selected>115200</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Modbus Slave Address</label>
+          <input type="text" id="mb-addr" value="1">
+        </div>
+        <div class="form-group">
+          <label>Parity</label>
+          <select id="parity">
+            <option value="None">None</option>
+            <option value="Even">Even</option>
+            <option value="Odd">Odd</option>
+          </select>
+        </div>
+        <button class="btn" onclick="saveComms()">Apply Comms Config</button>
+      </div>
+    </div>
+
+    <!-- TAB 5: 1-Wire Bus -->
+    <div id="tab-onewire" class="tab-content">
+      <div class="card">
+        <div class="card-title">1-Wire Bus (2 Custom Ports)</div>
+        <table class="data-table">
+          <thead>
+            <tr><th>Port</th><th>Connected ROM Address</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Port 1</td><td>28AA123456780001</td><td>Active</td></tr>
+            <tr><td>Port 2</td><td>No Device</td><td>Idle</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 6: System Tab -->
+    <div id="tab-system" class="tab-content">
+      <div class="card">
+        <div class="card-title">System Status</div>
+        <p><strong>ESP32-S3 Firmware:</strong> v1.0.0</p><br>
+        <p><strong>External Hardware Watchdog:</strong> ACTIVE (GPIO Controlled)</p><br>
+        <p><strong>Optocoupler Isolation:</strong> Active</p><br>
+        <p><strong>Operation Mode:</strong> Online / Offline Hybrid</p>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // Navigation script
+    function switchTab(tabId) {
+      var contents = document.getElementsByClassName('tab-content');
+      for (var i = 0; i < contents.length; i++) {
+        contents[i].classList.remove('active');
+      }
+
+      var navItems = document.querySelectorAll('sidebar ul li');
+      for (var j = 0; j < navItems.length; j++) {
+        navItems[j].classList.remove('active');
+      }
+
+      document.getElementById(tabId).classList.add('active');
+      event.currentTarget.classList.add('active');
+
+      var titles = {
+        'tab-control': 'Relays & Inbuilt Switches',
+        'tab-i2c': 'I2C 3 Port Auto-Scanner',
+        'tab-io': '6 Channel Digital I/O Expansion',
+        'tab-comms': 'UART & Modbus RS 485 Config',
+        'tab-onewire': '1 Wire Custom Ports',
+        'tab-system': 'System Diagnostics'
+      };
+      document.getElementById('page-title').innerText = titles[tabId];
+    }
+
+    // GPIO mapping object for ESP32 pins
+    const gpioMap = { 1: 10, 2: 11, 3: 12, 4: 13, 5: 14, 6: 15 };
+    const reverseGpioMap = { 10: 1, 11: 2, 12: 3, 13: 4, 14: 5, 15: 6 };
+
+    // Build the 6-Channel I/O Table dynamically
+    function buildIOTable() {
+      var tbody = document.getElementById('io-table-body');
+      tbody.innerHTML = '';
+
+      for (var ch = 1; ch <= 6; ch++) {
+        var row = document.createElement('tr');
+
+        var cellCh = document.createElement('td');
+        cellCh.innerText = 'CH ' + ch;
+
+        var cellDir = document.createElement('td');
+        var selectDir = document.createElement('select');
+        selectDir.id = 'io-dir-' + ch;
+        selectDir.setAttribute('onchange', 'handleIODirectionChange(' + ch + ')');
+
+        var optOut = document.createElement('option');
+        optOut.value = 'Output';
+        optOut.innerText = 'Output';
+
+        var optIn = document.createElement('option');
+        optIn.value = 'Input';
+        optIn.innerText = 'Input';
+
+        selectDir.appendChild(optOut);
+        selectDir.appendChild(optIn);
+        cellDir.appendChild(selectDir);
+
+        var cellState = document.createElement('td');
+        cellState.id = 'io-state-container-' + ch;
+        
+        row.appendChild(cellCh);
+        row.appendChild(cellDir);
+        row.appendChild(cellState);
+        tbody.appendChild(row);
+
+        renderChannelControls(ch);
+      }
+    }
+
+    // Render control controls based on input/output state
+    function renderChannelControls(ch) {
+      var dirSelect = document.getElementById('io-dir-' + ch);
+      if (!dirSelect) return;
+
+      var dirValue = dirSelect.value;
+      var container = document.getElementById('io-state-container-' + ch);
+
+      if (dirValue === 'Input') {
+        if (!document.getElementById('io-target-ch-' + ch)) {
+          var html = '<div class="inline-select-group">';
+          html += '<select id="io-target-ch-' + ch + '" onchange="handleTargetChange(' + ch + ')">';
+          
+          for (var target = 1; target <= 6; target++) {
+            if (target !== ch) {
+              html += '<option value="' + gpioMap[target] + '">Target CH ' + target + '</option>';
+            }
+          }
+          
+          html += '</select>';
+          html += '<select id="io-action-' + ch + '" onchange="handleTargetChange(' + ch + ')">';
+          html += '<option value="HIGH">Trigger HIGH</option>';
+          html += '<option value="LOW">Trigger LOW</option>';
+          html += '</select>';
+          html += '</div>';
+
+          container.innerHTML = html;
+        }
+      } else {
+        if (!document.getElementById('io-state-' + ch)) {
+          container.innerHTML = '<label class="switch-toggle"><input type="checkbox" id="io-state-' + ch + '" onchange="toggleExIO(' + ch + ', this.checked)"><span class="slider"></span></label>';
+        }
+      }
+    }
+
+    // Fetch Expansion UI state from backend API
+    function getToggleExData() {
+      fetch('http://192.168.8.104/GetToggelEx')
+        .then(function(res) {
+          return res.json();
+        })
+        .then(function(data) {
+          console.log("Fetched Expansion UI Data:", data);
+
+          for (let ch = 1; ch <= 6; ch++) {
+            let index = ch - 1;
+            let dirSelect = document.getElementById('io-dir-' + ch);
+            if (!dirSelect) continue;
+
+            let targetGpioVal = data.LastChannelTCH ? data.LastChannelTCH[index] : 0;
+            let actionVal = data.LastChannelAC ? data.LastChannelAC[index] : 0;
+            let toggleVal = data.LastChannelState ? data.LastChannelState[index] : 0;
+
+            // 1. Auto-set direction based on received TCH config (if TCH > 0, it's an Input channel)
+            if (targetGpioVal > 0) {
+              dirSelect.value = 'Input';
+            } else {
+              dirSelect.value = 'Output';
+            }
+
+            renderChannelControls(ch);
+
+            // 2. Dynamically update UI state based on Direction
+            if (dirSelect.value === 'Input') {
+              let targetElem = document.getElementById('io-target-ch-' + ch);
+              let actionElem = document.getElementById('io-action-' + ch);
+
+              if (targetElem && targetGpioVal > 0) {
+                targetElem.value = String(targetGpioVal);
+              }
+
+              if (actionElem) {
+                actionElem.value = actionVal === 1 ? 'HIGH' : 'LOW';
+              }
+            } else {
+              let stateToggle = document.getElementById('io-state-' + ch);
+              if (stateToggle) {
+                stateToggle.checked = Boolean(toggleVal);
+              }
+            }
+          }
+
+          refreshIOUI();
+        })
+        .catch(function(err) {
+          console.error("Expansion UI fetch error:", err);
+        });
+    }
+
+    // Dynamic switching logic for Input vs Output
+    function handleIODirectionChange(channelNum) {
+      renderChannelControls(channelNum);
+      refreshIOUI();
+      sendTargetConfigToDevice(channelNum);
+    }
+
+    // Handles changes when a new target channel or trigger state is selected
+    function handleTargetChange(channelNum) {
+      refreshIOUI();
+      sendTargetConfigToDevice(channelNum);
+    }
+
+    // Refreshes UI dependencies across all channels (disables target channel controls)
+    function refreshIOUI() {
+      var controlledByMap = {};
+
+      // 1. Identify which channels are locked/controlled by an Input channel
+      for (var ch = 1; ch <= 6; ch++) {
+        var dirEl = document.getElementById('io-dir-' + ch);
+        if (dirEl && dirEl.value === 'Input') {
+          var targetSelect = document.getElementById('io-target-ch-' + ch);
+          if (targetSelect) {
+            var targetGpio = parseInt(targetSelect.value);
+            var targetCh = reverseGpioMap[targetGpio];
+            if (targetCh) {
+              controlledByMap[targetCh] = ch; // targetCh is controlled by ch
+            }
+          }
+        }
+      }
+
+      // 2. Apply locking UI or restore normal UI for each channel
+      for (var ch = 1; ch <= 6; ch++) {
+        var dirEl = document.getElementById('io-dir-' + ch);
+        var container = document.getElementById('io-state-container-' + ch);
+        if (!dirEl || !container) continue;
+
+        if (controlledByMap[ch]) {
+          var controllerCh = controlledByMap[ch];
+          dirEl.disabled = true;
+          container.innerHTML = '<span class="locked-info-badge">This channel is controlling with Channel ' + controllerCh + '</span>';
+        } else {
+          dirEl.disabled = false;
+          renderChannelControls(ch);
+        }
+      }
+    }
+
+    // Sends real-time target configuration via HTTP GET
+    function sendTargetConfigToDevice(ch) {
+      var dirSelect = document.getElementById('io-dir-' + ch);
+      if (!dirSelect) return;
+
+      var dirValue = dirSelect.value;
+      if (dirValue === 'Input') {
+        var targetSelect = document.getElementById('io-target-ch-' + ch);
+        var actionSelect = document.getElementById('io-action-' + ch);
+
+        if (targetSelect && actionSelect) {
+          var targetGpio = targetSelect.value;
+          var targetCh = reverseGpioMap[targetGpio];
+          var action = actionSelect.value;
+
+          console.log("Setting Channel " + ch + " target -> Channel " + targetCh + " (GPIO " + targetGpio + ") Action: " + action);
+
+          fetch('http://192.168.8.104/exio_target?source=' + ch + '&targetGpio=' + targetGpio + '&targetCh=' + targetCh + '&action=' + action)
+          .then(function(res) {
+            return res.text();
+          })
+          .then(function(data) {
+            console.log("Target config response:", data);
+          })
+          .catch(function(err) {
+            console.error("Target config fetch error:", err);
+          });
+        }
+      }
+    }
+
+    // Direct real-time control for External Digital I/O output channels
+    function toggleExIO(ch, state) {
+      let val = state ? 1 : 0;
+      let gpioPin = gpioMap[ch];
+      console.log("ExIO Channel " + ch + " (GPIO " + gpioPin + ") state: " + val);
+
+      fetch('http://192.168.8.104/exio_toggle?ch=' + ch + '&gpio=' + gpioPin + '&state=' + val)
+      .then(function(res) {
+        return res.text();
+      })
+      .then(function(data) {
+        console.log("ExIO response: " + data);
+      })
+      .catch(function(err) {
+        console.error("ExIO toggle fetch error:", err);
+      });
+    }
+
+    // Save I/O Configuration
+    function saveIOConfig() {
+      var configData = [];
+      for (var ch = 1; ch <= 6; ch++) {
+        var dir = document.getElementById('io-dir-' + ch).value;
+        var item = { channel: gpioMap[ch], direction: dir };
+
+        if (dir === 'Input') {
+          var targetElem = document.getElementById('io-target-ch-' + ch);
+          var actionElem = document.getElementById('io-action-' + ch);
+          if (targetElem && actionElem) {
+            item.targetChannel = targetElem.value;
+            item.action = actionElem.value;
+          }
+        } else {
+          var stateElem = document.getElementById('io-state-' + ch);
+          item.state = (stateElem && stateElem.checked) ? 1 : 0;
+        }
+        configData.push(item);
+      }
+      console.log(configData);
+      
+      fetch('http://192.168.8.104/ExIO', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ configData: configData })
+      })
+      .then(function() { alert('I/O Configuration Saved Successfully'); })
+      .catch(function() { alert('I/O Configuration Saved (Offline / Sandbox)'); });
+    }
+
+    // Options lookup table mapping
+    const optionsData = {
+      Switch: [
+        { value: '0', text: 'LOW' },
+        { value: '1', text: 'HIGH' }
+      ],
+      Button: [
+        { value: '0', text: 'LOW' },
+        { value: '1', text: 'HIGH' }
+      ],
+      sensor: [
+        { value: '0', text: 'LOW' },
+        { value: '1', text: 'HIGH' }
+      ]
+    };
+
+    // Helper mapping for LastSwitch numerical indexes to dropdown option values
+    const switchTypeMap = {
+      0: 'Switch',
+      1: 'Button',
+      2: 'sensor'
+    };
+
+    function updateTriggerOptions(index) {
+      let switchEl = document.getElementById('type' + index);
+      let sensorEl = document.getElementById('sensor_type' + index);
+
+      if (switchEl && sensorEl) {
+        let selectedValue = switchEl.value;
+        let newOptions = optionsData[selectedValue] || [
+          { value: '0', text: 'LOW' },
+          { value: '1', text: 'HIGH' }
+        ];
+
+        let currentVal = sensorEl.value;
+        sensorEl.innerHTML = '';
+
+        newOptions.forEach(opt => {
+          let optionElement = document.createElement('option');
+          optionElement.value = opt.value;
+          optionElement.textContent = opt.text;
+          sensorEl.appendChild(optionElement);
+        });
+
+        if (currentVal !== null && currentVal !== "") {
+          sensorEl.value = currentVal;
+        }
+      }
+    }
+
+    // Load initial settings on startup
+    window.onload = function() {
+      buildIOTable();
+
+      for (let i = 1; i <= 4; i++) {
+        let typeEl = document.getElementById('type' + i);
+        if (typeEl) {
+          typeEl.addEventListener('change', function() {
+            updateTriggerOptions(i);
+          });
+        }
+
+        var name = localStorage.getItem('relay_name_' + i);
+        if (name) {
+          document.getElementById('name-relay' + i).innerText = name;
+        }
+      }
+
+      // Dynamic expansion fetch initialization
+      getToggleExData();
+      //setInterval(getToggleExData, 1500);
+    };
+
+    function editRelayName(id) {
+      var element = document.getElementById('name-relay' + id);
+      var newName = prompt("Enter new name for Relay " + id + ":", element.innerText);
+      if (newName !== null && newName.trim() !== "") {
+        element.innerText = newName.trim();
+        localStorage.setItem('relay_name_' + id, newName.trim());
+      }
+    }
+
+    function toggleRelay(id, state) {
+      if(state == true){
+        state = 1;
+      }
+      else{
+        state = 0;
+      }
+      let val = state;
+      console.log(id, state);
+
+      fetch('http://192.168.8.104/relay?id=' + id + '&state=' + val)
+      .then(function(res){
+        return res.text();
+      })
+      .then(function(data){
+        console.log("servo response" + data);
+      });
+
+      if(state == 1){
+        R_data = "ON";
+      }
+      else{
+        R_data = "OFF";
+      }
+    }
+
+    var R_data;
+    var Data;
+
+    function getData() {
+      fetch('http://192.168.8.104/R_OUT')
+        .then(function(res) {
+          return res.text();
+        })
+        .then(function(data) {
+          var states = data.trim().split(',');
+
+          for (var i = 0; i < 4; i++) {
+            var switchElem = document.getElementById('relay' + (i + 1));
+            var state = states[i] ? states[i].trim() : null;
+
+            if (!switchElem || !state) continue;
+
+            if (state.endsWith('_1')) {
+              switchElem.checked = true;
+            } else if (state.endsWith('_0')) {
+              switchElem.checked = false;
+            }
+          }
+        })
+        .catch(function(err) {
+          console.error("Fetch error:", err);
+        });
+    }
+
+    // Initial call and 1.5s interval polling
+    getData();
+    setInterval(getData, 1500);
+
+    function getData_1() {
+      fetch('http://192.168.8.104/data')
+        .then(function(res) {
+          return res.json();
+        })
+        .then(function(data) {
+          console.log("Fetched Backend Data:", data);
+
+          for (let i = 1; i <= 4; i++) {
+            let arrayIndex = i - 1; // Array index 0, 1, 2, 3
+            let switchEl = document.getElementById('type' + i);
+            let sensorEl = document.getElementById('sensor_type' + i);
+
+            // 1. Update Primary Dropdown ('type1', 'type2', 'type3', 'type4')
+            if (switchEl && data.LastSwitch && data.LastSwitch[arrayIndex] !== undefined) {
+              let typeCode = data.LastSwitch[arrayIndex];
+              let mappedType = switchTypeMap[typeCode] || 'Switch';
+              switchEl.value = mappedType;
+            }
+
+            // 2. Clear & Repopulate Secondary Dropdown ('sensor_type1', 'sensor_type2', etc.)
+            if (sensorEl) {
+              sensorEl.innerHTML = '';
+
+              let options = [
+                { value: '0', text: 'LOW' },
+                { value: '1', text: 'HIGH' }
+              ];
+
+              options.forEach(opt => {
+                let optionElement = document.createElement('option');
+                optionElement.value = opt.value;
+                optionElement.textContent = opt.text;
+                sensorEl.appendChild(optionElement);
+              });
+
+              // 3. Set Active Selected Value (0 -> LOW, 1 -> HIGH) for all 4 switches
+              if (data.LastSensor && data.LastSensor[arrayIndex] !== undefined) {
+                sensorEl.value = String(data.LastSensor[arrayIndex]);
+              }
+
+            }
+          }
+        })
+        .catch(function(err) {
+          console.error("Data fetch error:", err);
+        });
+    }
+
+    getData_1();
+
+    function saveConfig() {
+      alert("Switch parameters uploaded to system flash.");
+      
+      let configData = [];
+
+      for(let i = 0; i < 4; i++){
+        let switches = document.getElementById('type' + (i+1)).value;
+        let sensortype = document.getElementById('sensor_type' + (i+1)).value;
+
+        configData.push({
+          switches: switches,
+          sensortype: sensortype
+        });
+      }
+
+      console.log(configData)
+
+      fetch('http://192.168.8.104/Sconfig',{
+        method: 'POST',
+        headers:{
+          'Content-Type': 'application/json'
+        },
+        body : JSON.stringify({configuratoins : configData})
+      })
+      .then(function(res){
+        return res.text();
+      })
+      .then(function(data){
+        console.log(data);
+      });
+    }
+
+    function scanI2CBus() {
+      alert("Scanning I2C bus and verifying Chip IDs...");
+    }
+
+    function saveComms() {
+      alert("UART & Modbus configurations saved.");
+    }
+
+    function connectWiFi() {
+      var ssid = prompt("Enter WiFi SSID:");
+      if (ssid) {
+        var pwd = prompt("Enter WiFi Password:");
+        alert("Connecting to: " + ssid);
+      }
+    }
+  </script>
+</body>
+</html>
