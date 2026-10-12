@@ -15,6 +15,10 @@
       --text-main: #e1e6eb;
       --text-muted: #8a9ba8;
       --input-bg: #29323c;
+      --accent-blue: #2563eb;
+      --accent-green: #10b981;
+      --accent-purple: #8b5cf6;
+      --accent-amber: #f59e0b;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
@@ -84,6 +88,19 @@
     }
     .btn:hover { opacity: 0.9; }
 
+    .btn-sm {
+      background-color: var(--accent-blue);
+      color: #ffffff;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: bold;
+      transition: background 0.2s;
+    }
+    .btn-sm:hover { background-color: #1d4ed8; }
+
     /* Card Panels */
     .card {
       background: var(--card-dark);
@@ -99,6 +116,9 @@
       padding-bottom: 6px;
       border-bottom: 1px solid var(--card-border);
       color: #ffffff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     /* Grids & Forms */
@@ -107,6 +127,77 @@
       display: flex; justify-content: space-between; align-items: center;
       padding: 12px; background: #182026; border: 1px solid var(--card-border); border-radius: 4px;
     }
+
+    /* Dynamic Sensor UI Styles */
+    .sensor-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+    
+    .sensor-metric-card {
+      background: #141b20;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .metric-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #182026;
+      padding: 10px 14px;
+      border-radius: 4px;
+      border: 1px solid #232d36;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: bold;
+      letter-spacing: 0.5px;
+    }
+
+    .metric-value {
+      font-size: 18px;
+      font-weight: bold;
+      color: #ffffff;
+    }
+
+    .automation-section {
+      background: #182026;
+      border: 1px solid #283542;
+      border-radius: 5px;
+      padding: 10px;
+      margin-top: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .automation-title {
+      font-size: 11px;
+      font-weight: bold;
+      color: var(--accent-amber);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .sensor-badge {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge-temp { background-color: rgba(37, 99, 235, 0.2); color: #60a5fa; border: 1px solid #2563eb; }
+    .badge-air { background-color: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
 
     /* Switches */
     .switch-toggle { position: relative; width: 48px; height: 24px; display: inline-block; }
@@ -129,25 +220,29 @@
     }
     .data-table th { background-color: #182026; color: var(--text-muted); }
 
-    select, input[type="text"] {
+    select, input[type="text"], input[type="number"] {
       padding: 6px 10px; border-radius: 4px; border: 1px solid var(--card-border);
       outline: none; background-color: var(--input-bg); color: var(--text-main); font-size: 12px; width: 100%;
     }
-    select:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
+    select:disabled { opacity: 0.6; cursor: not-allowed; }
 
     .form-group { margin-bottom: 12px; }
     .form-group label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
     
-    .inline-select-group { display: flex; gap: 8px; }
+    .inline-group { display: flex; gap: 6px; align-items: center; }
     
     .locked-info-badge {
       color: #e2a03f;
       font-weight: bold;
       font-size: 12px;
       font-style: italic;
+    }
+
+    .relay-control-indicator {
+      font-size: 10px;
+      color: var(--accent-green);
+      margin-top: 3px;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -159,9 +254,9 @@
     <ul class="nav-links">
       <li class="active" onclick="switchTab('tab-control')">Relays & Switches</li>
       <li onclick="switchTab('tab-i2c')">I2C Scanner</li>
-      <li onclick="switchTab('tab-io')">8-CH Digital I/O</li>
+      <li onclick="switchTab('tab-io')">6 CH Digital I/O</li>
       <li onclick="switchTab('tab-comms')">UART & Modbus</li>
-      <li onclick="switchTab('tab-onewire')">1-Wire Bus</li>
+      <li onclick="switchTab('tab-onewire')">1 Wire Bus</li>
       <li onclick="switchTab('tab-system')">System</li>
     </ul>
   </sidebar>
@@ -179,28 +274,40 @@
         <div class="card-title">4 Inbuilt Relays</div>
         <div class="relay-grid">
           <div class="relay-item">
-            <span id="name-relay1">Relay 1</span>
+            <div>
+              <span id="name-relay1">Relay 1</span>
+              <div id="relay-control-indicator-1" class="relay-control-indicator"></div>
+            </div>
             <div>
               <button class="btn" style="padding: 2px 6px; font-size: 10px;" onclick="editRelayName(1)">Edit</button>
               <label class="switch-toggle"><input type="checkbox" id="relay1" onchange="toggleRelay(1, this.checked)"><span class="slider"></span></label>
             </div>
           </div>
           <div class="relay-item">
-            <span id="name-relay2">Relay 2</span>
+            <div>
+              <span id="name-relay2">Relay 2</span>
+              <div id="relay-control-indicator-2" class="relay-control-indicator"></div>
+            </div>
             <div>
               <button class="btn" style="padding: 2px 6px; font-size: 10px;" onclick="editRelayName(2)">Edit</button>
               <label class="switch-toggle"><input type="checkbox" id="relay2" onchange="toggleRelay(2, this.checked)"><span class="slider"></span></label>
             </div>
           </div>
           <div class="relay-item">
-            <span id="name-relay3">Relay 3</span>
+            <div>
+              <span id="name-relay3">Relay 3</span>
+              <div id="relay-control-indicator-3" class="relay-control-indicator"></div>
+            </div>
             <div>
               <button class="btn" style="padding: 2px 6px; font-size: 10px;" onclick="editRelayName(3)">Edit</button>
               <label class="switch-toggle"><input type="checkbox" id="relay3" onchange="toggleRelay(3, this.checked)"><span class="slider"></span></label>
             </div>
           </div>
           <div class="relay-item">
-            <span id="name-relay4">Relay 4</span>
+            <div>
+              <span id="name-relay4">Relay 4</span>
+              <div id="relay-control-indicator-4" class="relay-control-indicator"></div>
+            </div>
             <div>
               <button class="btn" style="padding: 2px 6px; font-size: 10px;" onclick="editRelayName(4)">Edit</button>
               <label class="switch-toggle"><input type="checkbox" id="relay4" onchange="toggleRelay(4, this.checked)"><span class="slider"></span></label>
@@ -243,20 +350,31 @@
       </div>
     </div>
 
-    <!-- TAB 2: I2C Scanner (3 Ports) -->
+    <!-- TAB 2: I2C Scanner (2 Ports & Active Sensor Monitors) -->
     <div id="tab-i2c" class="tab-content">
       <div class="card">
         <div class="card-title">I2C 2 Port Scanner</div>
         <button class="btn" style="margin-bottom: 15px;" onclick="scanI2CBus()">Scan Buses</button>
         <table class="data-table">
           <thead>
-            <tr><th>Port</th><th>Address</th><th>Chip ID</th><th>Driver Status</th></tr>
+            <tr><th>Port</th><th>Detected Sensor Type</th></tr>
           </thead>
           <tbody id="i2c-results">
-            <tr><td>Port 1</td><td>---</td><td>---</td><td>Idle</td></tr>
-            <tr><td>Port 2</td><td>---</td><td>---</td><td>Idle</td></tr>
+            <tr><td>BUS 1</td><td id="Port_1">--</td></tr>
+            <tr><td>BUS 2</td><td id="Port_2">--</td></tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Dynamically Populated Sensor Dashboard Area -->
+      <div class="card">
+        <div class="card-title">
+          <span>Active I2C Sensors Monitor</span>
+          <button class="btn" style="padding: 6px 12px; font-size: 11px;" onclick="saveAllAutomations()">Save All Automations</button>
+        </div>
+        <div id="i2c-sensor-container" class="sensor-grid">
+          <p style="color: var(--text-muted); font-size: 12px; grid-column: 1 / -1;">Waiting for I2C telemetry data...</p>
+        </div>
       </div>
     </div>
 
@@ -329,7 +447,7 @@
     <div id="tab-system" class="tab-content">
       <div class="card">
         <div class="card-title">System Status</div>
-        <p><strong>ESP32-S3 Firmware:</strong> v1.0.0</p><br>
+        <p><strong>LX100 Firmware:</strong> v1.0.0</p><br>
         <p><strong>External Hardware Watchdog:</strong> ACTIVE (GPIO Controlled)</p><br>
         <p><strong>Optocoupler Isolation:</strong> Active</p><br>
         <p><strong>Operation Mode:</strong> Online / Offline Hybrid</p>
@@ -339,6 +457,12 @@
   </main>
 
   <script>
+    // Mapping to store each bus's specific sensor category independently
+    let sensorCategories = {};
+
+    // Mapping between ESP32 physical pins and UI Relay card indices (1 to 4)
+    const pinToRelayIndex = { 1: 1, 2: 2, 4: 3, 5: 4 };
+
     // Navigation script
     function switchTab(tabId) {
       var contents = document.getElementsByClassName('tab-content');
@@ -356,13 +480,281 @@
 
       var titles = {
         'tab-control': 'Relays & Inbuilt Switches',
-        'tab-i2c': 'I2C 3 Port Auto-Scanner',
+        'tab-i2c': 'I2C 2 Port Auto-Scanner',
         'tab-io': '6 Channel Digital I/O Expansion',
         'tab-comms': 'UART & Modbus RS 485 Config',
         'tab-onewire': '1 Wire Custom Ports',
         'tab-system': 'System Diagnostics'
       };
       document.getElementById('page-title').innerText = titles[tabId];
+    }
+
+    // Sensor Classification Lists
+    const tempSensorList = ["AHT10 / AHT20", "HS4001", "SHT31 / SHT30"];
+    const airSensorList = ["BME680","BME688","ZMOD4410AI1V ","SGP30"];
+
+    function getSensorCategory(sensorType) {
+      if (!sensorType) return 'UNKNOWN';
+      let cleanType = sensorType.trim().toUpperCase();
+
+      for (let s of tempSensorList) {
+        if (cleanType.includes(s.toUpperCase()) || s.toUpperCase().includes(cleanType)) return 'TEMP_HUM';
+      }
+      for (let a of airSensorList) {
+        if (cleanType.includes(a.toUpperCase()) || a.toUpperCase().includes(cleanType)) return 'AIR';
+      }
+
+      if (cleanType.includes('AHT') || cleanType.includes('SHT') || cleanType.includes('HS4001') || cleanType.includes('TEMP')) return 'TEMP_HUM';
+      if (cleanType.includes('SGP') || cleanType.includes('ZMOD') || cleanType.includes('AIR') || cleanType.includes('TVOC') || cleanType.includes('CO2')) return 'AIR';
+
+      return 'UNKNOWN';
+    }
+
+    let savedAutomationsState = {};
+    let lastRenderedBusKeyString = "";
+
+    function updateRelayControlIndicator() {
+      for (let i = 1; i <= 4; i++) {
+        let indicator = document.getElementById('relay-control-indicator-' + i);
+        if (!indicator) continue;
+        let controllingBus = null;
+        for (let busKey in savedAutomationsState) {
+          let assignedPin = savedAutomationsState[busKey].relay;
+          let uiRelayIndex = pinToRelayIndex[assignedPin] || assignedPin;
+          if (uiRelayIndex === i) {
+            controllingBus = busKey.replace('_', ' ');
+            break;
+          }
+        }
+        indicator.innerText = controllingBus ? `Controlled by ${controllingBus}` : "";
+      }
+    }
+
+    // Fetch automation config from ESP32 via HTTP GET
+    function getAutomationConfig() {
+      fetch('http://192.168.8.101/I2C_POST')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (!data) return;
+          console.log("Fetched Automation Config from ESP32:", data);
+
+          ['BUS_1', 'BUS_2'].forEach(busKey => {
+            if (data[busKey]) {
+              let relay = data[busKey][busKey + '_relay'];
+              let thresh = data[busKey][busKey + '_thresh'];
+              let cond = data[busKey][busKey + '_Condition'];
+
+              if (relay !== undefined) {
+                if (relay > 0) {
+                  savedAutomationsState[busKey] = { relay: relay };
+                } else {
+                  delete savedAutomationsState[busKey];
+                }
+
+                // Update DOM inputs if they exist
+                let relayEl = document.getElementById(`automation-relay-${busKey}`);
+                let condEl = document.getElementById(`automation-cond-${busKey}`);
+                let threshEl = document.getElementById(`automation-thresh-${busKey}`);
+
+                if (relayEl) relayEl.value = relay;
+                if (condEl && cond) condEl.value = cond.toLowerCase();
+                if (threshEl && thresh !== undefined) threshEl.value = thresh;
+              }
+            }
+          });
+
+          updateRelayControlIndicator();
+        })
+        .catch(function(err) {
+          console.error("Get automation config error:", err);
+        });
+    }
+
+    // Master function to save both sensors' automation configuration together as a flat JSON
+    function saveAllAutomations() {
+      let payload = {};
+      let activeBuses = ['BUS_1', 'BUS_2'];
+
+      activeBuses.forEach(busKey => {
+        let relayEl = document.getElementById(`automation-relay-${busKey}`);
+        let conditionEl = document.getElementById(`automation-cond-${busKey}`);
+        let thresholdEl = document.getElementById(`automation-thresh-${busKey}`);
+
+        if (relayEl && conditionEl && thresholdEl) {
+          let rId = parseInt(relayEl.value);
+          let prefix = (busKey === 'BUS_1') ? 'b1' : 'b2';
+          
+          payload[prefix + '_bus'] = busKey;
+          payload[prefix + '_relay'] = rId;
+          payload[prefix + '_cond'] = conditionEl.value;
+          payload[prefix + '_thresh'] = parseFloat(thresholdEl.value) || 0;
+          
+          // Use the independent per-bus category stored during render
+          let category = sensorCategories[busKey];
+          if (category === 'TEMP_HUM') {
+            payload[prefix + '_type'] = "temp";
+          } else if (category === 'AIR') {
+            payload[prefix + '_type'] = "air";
+          }
+
+          if (rId > 0) {
+            savedAutomationsState[busKey] = { relay: rId };
+          } else {
+            delete savedAutomationsState[busKey];
+          }
+        }
+      });
+
+      updateRelayControlIndicator();
+      console.log("Sending Unified Automation JSON Payload:", payload);
+
+      fetch('http://192.168.8.101/i2c_automation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(function(res) { return res.text(); })
+      .then(function(data) { alert("All I2C sensor automation rules saved successfully!"); })
+      .catch(function(err) { alert("Automation rules saved (Sandbox / Offline mode)."); });
+    }
+
+    // Smart Sensor UI Generator (prevents overwriting/wiping active inputs every 2s)
+    function renderI2CSensorUI(i2cData) {
+      let container = document.getElementById('i2c-sensor-container');
+      if (!container) return;
+
+      let busKeys = Object.keys(i2cData).filter(k => k.startsWith('BUS_'));
+      let currentBusKeyString = busKeys.join(',');
+
+      if (busKeys.length === 0) {
+        lastRenderedBusKeyString = "";
+        container.innerHTML = '<p style="color: var(--text-muted); font-size: 12px; grid-column: 1 / -1;">No active sensors detected on I2C buses.</p>';
+        return;
+      }
+
+      if (currentBusKeyString !== lastRenderedBusKeyString) {
+        lastRenderedBusKeyString = currentBusKeyString;
+        let html = '';
+
+        busKeys.forEach(busKey => {
+          let busObj = i2cData[busKey];
+          let type = busObj.type || 'Unknown';
+          let category = getSensorCategory(type);
+          
+          // Save category independently for this specific bus
+          sensorCategories[busKey] = category;
+          let busLabel = busKey.replace('_', ' ');
+
+          if (category === 'TEMP_HUM') {
+            html += `
+              <div class="sensor-metric-card" id="card-${busKey}">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <strong style="color: #fff; font-size: 13px;">${busLabel}: <span>${type}</span></strong>
+                  <span class="sensor-badge badge-temp">Temp & Humidity</span>
+                </div>
+                <div class="metric-row">
+                  <span class="metric-label">TEMPERATURE</span>
+                  <span class="metric-value" id="val-temp-${busKey}" style="color: #60a5fa;">-- °C</span>
+                </div>
+                <div class="metric-row">
+                  <span class="metric-label">HUMIDITY</span>
+                  <span class="metric-value" id="val-hum-${busKey}" style="color: #38bdf8;">-- %</span>
+                </div>
+                <div class="automation-section">
+                  <div class="automation-title">Relay Automation Trigger</div>
+                  <div class="inline-group">
+                    <select id="automation-relay-${busKey}" style="flex: 1.2;">
+                      <option value="0">None (Disabled)</option>
+                      <option value="1">Relay 1</option>
+                      <option value="2">Relay 2</option>
+                      <option value="4">Relay 3</option>
+                      <option value="5">Relay 4</option>
+                    </select>
+                    <select id="automation-cond-${busKey}" style="flex: 1;">
+                      <option value="above">When Above</option>
+                      <option value="below">When Below</option>
+                    </select>
+                  </div>
+                  <div class="inline-group">
+                    <input type="number" step="0.5" id="automation-thresh-${busKey}" value="25.0" placeholder="Threshold value" style="width: 100%;">
+                  </div>
+                </div>
+              </div>
+            `;
+          } else if (category === 'AIR') {
+            html += `
+              <div class="sensor-metric-card" id="card-${busKey}">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <strong style="color: #fff; font-size: 13px;">${busLabel}: <span>${type}</span></strong>
+                  <span class="sensor-badge badge-air">Air Quality</span>
+                </div>
+                <div class="metric-row">
+                  <span class="metric-label">TVOC</span>
+                  <span class="metric-value" id="val-tvoc-${busKey}" style="color: #34d399;">-- ppb</span>
+                </div>
+                <div class="metric-row">
+                  <span class="metric-label">eCO2 / IAQ</span>
+                  <span class="metric-value" id="val-eco2-${busKey}" style="color: #a7f3d0;">-- ppm</span>
+                </div>
+                <div class="automation-section">
+                  <div class="automation-title">Gas Automation Trigger</div>
+                  <div class="inline-group">
+                    <select id="automation-relay-${busKey}" style="flex: 1.2;">
+                      <option value="0">None (Disabled)</option>
+                      <option value="1">Relay 1</option>
+                      <option value="2">Relay 2</option>
+                      <option value="4">Relay 3</option>
+                      <option value="5">Relay 4</option>
+                    </select>
+                    <select id="automation-cond-${busKey}" style="flex: 1;">
+                      <option value="above">When Above</option>
+                      <option value="below">When Below</option>
+                    </select>
+                  </div>
+                  <div class="inline-group">
+                    <input type="number" step="10" id="automation-thresh-${busKey}" value="200" placeholder="Gas Threshold (ppb)" style="width: 100%;">
+                  </div>
+                </div>
+              </div>
+            `;
+          } else {
+            html += `
+              <div class="sensor-metric-card" id="card-${busKey}">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <strong style="color: #fff; font-size: 13px;">${busLabel}: <span>${type}</span></strong>
+                  <span class="sensor-badge" style="background: #374151; color: #9ca3af;">Generic Device</span>
+                </div>
+                <div class="metric-row">
+                  <span class="metric-label">STATUS</span>
+                  <span class="metric-value" style="font-size: 14px; color: #9ca3af;">Connected</span>
+                </div>
+              </div>
+            `;
+          }
+        });
+
+        container.innerHTML = html;
+        
+        // Fetch and sync automation values from ESP32 after rendering the cards
+        getAutomationConfig();
+      }
+
+      // Live Telemetry Value Updates (Runs every 2s without touching inputs)
+      busKeys.forEach(busKey => {
+        let busObj = i2cData[busKey];
+        let category = getSensorCategory(busObj.type);
+        if (category === 'TEMP_HUM') {
+          let tempEl = document.getElementById(`val-temp-${busKey}`);
+          let humEl = document.getElementById(`val-hum-${busKey}`);
+          if (tempEl && busObj.temp !== undefined) tempEl.innerText = busObj.temp + ' °C';
+          if (humEl && busObj.hum !== undefined) humEl.innerText = busObj.hum + ' %';
+        } else if (category === 'AIR') {
+          let tvocEl = document.getElementById(`val-tvoc-${busKey}`);
+          let eco2El = document.getElementById(`val-eco2-${busKey}`);
+          if (tvocEl) tvocEl.innerText = (busObj.tvoc !== undefined ? busObj.tvoc : (busObj.tvoc_raw || '--')) + ' ppb';
+          if (eco2El) eco2El.innerText = (busObj.eco2 !== undefined ? busObj.eco2 : (busObj.eco2_raw || '--')) + ' ppm';
+        }
+      });
     }
 
     // GPIO mapping object for ESP32 pins
@@ -409,7 +801,6 @@
       }
     }
 
-    // Render control controls based on input/output state
     function renderChannelControls(ch) {
       var dirSelect = document.getElementById('io-dir-' + ch);
       if (!dirSelect) return;
@@ -419,7 +810,7 @@
 
       if (dirValue === 'Input') {
         if (!document.getElementById('io-target-ch-' + ch)) {
-          var html = '<div class="inline-select-group">';
+          var html = '<div class="inline-group">';
           html += '<select id="io-target-ch-' + ch + '" onchange="handleTargetChange(' + ch + ')">';
           
           for (var target = 1; target <= 6; target++) {
@@ -444,15 +835,10 @@
       }
     }
 
-    // Fetch Expansion UI state from backend API
     function getToggleExData() {
-      fetch('http://192.168.8.104/GetToggelEx')
-        .then(function(res) {
-          return res.json();
-        })
+      fetch('http://192.168.8.101/GetToggelEx')
+        .then(function(res) { return res.json(); })
         .then(function(data) {
-          console.log("Fetched Expansion UI Data:", data);
-
           for (let ch = 1; ch <= 6; ch++) {
             let index = ch - 1;
             let dirSelect = document.getElementById('io-dir-' + ch);
@@ -462,7 +848,6 @@
             let actionVal = data.LastChannelAC ? data.LastChannelAC[index] : 0;
             let toggleVal = data.LastChannelState ? data.LastChannelState[index] : 0;
 
-            // 1. Auto-set direction based on received TCH config (if TCH > 0, it's an Input channel)
             if (targetGpioVal > 0) {
               dirSelect.value = 'Input';
             } else {
@@ -471,7 +856,6 @@
 
             renderChannelControls(ch);
 
-            // 2. Dynamically update UI state based on Direction
             if (dirSelect.value === 'Input') {
               let targetElem = document.getElementById('io-target-ch-' + ch);
               let actionElem = document.getElementById('io-action-' + ch);
@@ -493,29 +877,23 @@
 
           refreshIOUI();
         })
-        .catch(function(err) {
-          console.error("Expansion UI fetch error:", err);
-        });
+        .catch(function(err) { console.error("Expansion UI fetch error:", err); });
     }
 
-    // Dynamic switching logic for Input vs Output
     function handleIODirectionChange(channelNum) {
       renderChannelControls(channelNum);
       refreshIOUI();
       sendTargetConfigToDevice(channelNum);
     }
 
-    // Handles changes when a new target channel or trigger state is selected
     function handleTargetChange(channelNum) {
       refreshIOUI();
       sendTargetConfigToDevice(channelNum);
     }
 
-    // Refreshes UI dependencies across all channels (disables target channel controls)
     function refreshIOUI() {
       var controlledByMap = {};
 
-      // 1. Identify which channels are locked/controlled by an Input channel
       for (var ch = 1; ch <= 6; ch++) {
         var dirEl = document.getElementById('io-dir-' + ch);
         if (dirEl && dirEl.value === 'Input') {
@@ -524,13 +902,12 @@
             var targetGpio = parseInt(targetSelect.value);
             var targetCh = reverseGpioMap[targetGpio];
             if (targetCh) {
-              controlledByMap[targetCh] = ch; // targetCh is controlled by ch
+              controlledByMap[targetCh] = ch;
             }
           }
         }
       }
 
-      // 2. Apply locking UI or restore normal UI for each channel
       for (var ch = 1; ch <= 6; ch++) {
         var dirEl = document.getElementById('io-dir-' + ch);
         var container = document.getElementById('io-state-container-' + ch);
@@ -547,7 +924,6 @@
       }
     }
 
-    // Sends real-time target configuration via HTTP GET
     function sendTargetConfigToDevice(ch) {
       var dirSelect = document.getElementById('io-dir-' + ch);
       if (!dirSelect) return;
@@ -562,41 +938,22 @@
           var targetCh = reverseGpioMap[targetGpio];
           var action = actionSelect.value;
 
-          console.log("Setting Channel " + ch + " target -> Channel " + targetCh + " (GPIO " + targetGpio + ") Action: " + action);
-
-          fetch('http://192.168.8.104/exio_target?source=' + ch + '&targetGpio=' + targetGpio + '&targetCh=' + targetCh + '&action=' + action)
-          .then(function(res) {
-            return res.text();
-          })
-          .then(function(data) {
-            console.log("Target config response:", data);
-          })
-          .catch(function(err) {
-            console.error("Target config fetch error:", err);
-          });
+          fetch('http://192.168.8.101/exio_target?source=' + ch + '&targetGpio=' + targetGpio + '&targetCh=' + targetCh + '&action=' + action)
+          .then(function(res) { return res.text(); })
+          .catch(function(err) { console.error("Target config fetch error:", err); });
         }
       }
     }
 
-    // Direct real-time control for External Digital I/O output channels
     function toggleExIO(ch, state) {
       let val = state ? 1 : 0;
       let gpioPin = gpioMap[ch];
-      console.log("ExIO Channel " + ch + " (GPIO " + gpioPin + ") state: " + val);
 
-      fetch('http://192.168.8.104/exio_toggle?ch=' + ch + '&gpio=' + gpioPin + '&state=' + val)
-      .then(function(res) {
-        return res.text();
-      })
-      .then(function(data) {
-        console.log("ExIO response: " + data);
-      })
-      .catch(function(err) {
-        console.error("ExIO toggle fetch error:", err);
-      });
+      fetch('http://192.168.8.101/exio_toggle?ch=' + ch + '&gpio=' + gpioPin + '&state=' + val)
+      .then(function(res) { return res.text(); })
+      .catch(function(err) { console.error("ExIO toggle fetch error:", err); });
     }
 
-    // Save I/O Configuration
     function saveIOConfig() {
       var configData = [];
       for (var ch = 1; ch <= 6; ch++) {
@@ -616,9 +973,8 @@
         }
         configData.push(item);
       }
-      console.log(configData);
       
-      fetch('http://192.168.8.104/ExIO', {
+      fetch('http://192.168.8.101/ExIO', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ configData: configData })
@@ -627,28 +983,13 @@
       .catch(function() { alert('I/O Configuration Saved (Offline / Sandbox)'); });
     }
 
-    // Options lookup table mapping
     const optionsData = {
-      Switch: [
-        { value: '0', text: 'LOW' },
-        { value: '1', text: 'HIGH' }
-      ],
-      Button: [
-        { value: '0', text: 'LOW' },
-        { value: '1', text: 'HIGH' }
-      ],
-      sensor: [
-        { value: '0', text: 'LOW' },
-        { value: '1', text: 'HIGH' }
-      ]
+      Switch: [{ value: '0', text: 'LOW' }, { value: '1', text: 'HIGH' }],
+      Button: [{ value: '0', text: 'LOW' }, { value: '1', text: 'HIGH' }],
+      sensor: [{ value: '0', text: 'LOW' }, { value: '1', text: 'HIGH' }]
     };
 
-    // Helper mapping for LastSwitch numerical indexes to dropdown option values
-    const switchTypeMap = {
-      0: 'Switch',
-      1: 'Button',
-      2: 'sensor'
-    };
+    const switchTypeMap = { 0: 'Switch', 1: 'Button', 2: 'sensor' };
 
     function updateTriggerOptions(index) {
       let switchEl = document.getElementById('type' + index);
@@ -677,7 +1018,6 @@
       }
     }
 
-    // Load initial settings on startup
     window.onload = function() {
       buildIOTable();
 
@@ -695,9 +1035,8 @@
         }
       }
 
-      // Dynamic expansion fetch initialization
       getToggleExData();
-      //setInterval(getToggleExData, 1500);
+      getAutomationConfig();
     };
 
     function editRelayName(id) {
@@ -710,46 +1049,20 @@
     }
 
     function toggleRelay(id, state) {
-      if(state == true){
-        state = 1;
-      }
-      else{
-        state = 0;
-      }
-      let val = state;
-      console.log(id, state);
-
-      fetch('http://192.168.8.104/relay?id=' + id + '&state=' + val)
-      .then(function(res){
-        return res.text();
-      })
-      .then(function(data){
-        console.log("servo response" + data);
-      });
-
-      if(state == 1){
-        R_data = "ON";
-      }
-      else{
-        R_data = "OFF";
-      }
+      let val = state ? 1 : 0;
+      fetch('http://192.168.8.101/relay?id=' + id + '&state=' + val)
+      .then(function(res){ return res.text(); })
+      .then(function(data){ console.log("relay response: " + data); });
     }
 
-    var R_data;
-    var Data;
-
     function getData() {
-      fetch('http://192.168.8.104/R_OUT')
-        .then(function(res) {
-          return res.text();
-        })
+      fetch('http://192.168.8.101/R_OUT')
+        .then(function(res) { return res.text(); })
         .then(function(data) {
           var states = data.trim().split(',');
-
           for (var i = 0; i < 4; i++) {
             var switchElem = document.getElementById('relay' + (i + 1));
             var state = states[i] ? states[i].trim() : null;
-
             if (!switchElem || !state) continue;
 
             if (state.endsWith('_1')) {
@@ -759,101 +1072,98 @@
             }
           }
         })
-        .catch(function(err) {
-          console.error("Fetch error:", err);
-        });
+        .catch(function(err) { console.error("Fetch error:", err); });
     }
 
-    // Initial call and 1.5s interval polling
     getData();
     setInterval(getData, 1500);
 
     function getData_1() {
-      fetch('http://192.168.8.104/data')
-        .then(function(res) {
-          return res.json();
-        })
+      fetch('http://192.168.8.101/data')
+        .then(function(res) { return res.json(); })
         .then(function(data) {
-          console.log("Fetched Backend Data:", data);
-
           for (let i = 1; i <= 4; i++) {
-            let arrayIndex = i - 1; // Array index 0, 1, 2, 3
+            let arrayIndex = i - 1;
             let switchEl = document.getElementById('type' + i);
             let sensorEl = document.getElementById('sensor_type' + i);
 
-            // 1. Update Primary Dropdown ('type1', 'type2', 'type3', 'type4')
             if (switchEl && data.LastSwitch && data.LastSwitch[arrayIndex] !== undefined) {
               let typeCode = data.LastSwitch[arrayIndex];
-              let mappedType = switchTypeMap[typeCode] || 'Switch';
-              switchEl.value = mappedType;
+              switchEl.value = switchTypeMap[typeCode] || 'Switch';
             }
 
-            // 2. Clear & Repopulate Secondary Dropdown ('sensor_type1', 'sensor_type2', etc.)
             if (sensorEl) {
               sensorEl.innerHTML = '';
-
-              let options = [
-                { value: '0', text: 'LOW' },
-                { value: '1', text: 'HIGH' }
-              ];
-
-              options.forEach(opt => {
+              [{ value: '0', text: 'LOW' }, { value: '1', text: 'HIGH' }].forEach(opt => {
                 let optionElement = document.createElement('option');
                 optionElement.value = opt.value;
                 optionElement.textContent = opt.text;
                 sensorEl.appendChild(optionElement);
               });
 
-              // 3. Set Active Selected Value (0 -> LOW, 1 -> HIGH) for all 4 switches
               if (data.LastSensor && data.LastSensor[arrayIndex] !== undefined) {
                 sensorEl.value = String(data.LastSensor[arrayIndex]);
               }
-
             }
           }
         })
-        .catch(function(err) {
-          console.error("Data fetch error:", err);
-        });
+        .catch(function(err) { console.error("Data fetch error:", err); });
     }
 
     getData_1();
 
     function saveConfig() {
-      alert("Switch parameters uploaded to system flash.");
-      
       let configData = [];
-
       for(let i = 0; i < 4; i++){
-        let switches = document.getElementById('type' + (i+1)).value;
-        let sensortype = document.getElementById('sensor_type' + (i+1)).value;
-
         configData.push({
-          switches: switches,
-          sensortype: sensortype
+          switches: document.getElementById('type' + (i+1)).value,
+          sensortype: document.getElementById('sensor_type' + (i+1)).value
         });
       }
 
-      console.log(configData)
-
-      fetch('http://192.168.8.104/Sconfig',{
+      fetch('http://192.168.8.101/Sconfig',{
         method: 'POST',
-        headers:{
-          'Content-Type': 'application/json'
-        },
+        headers:{ 'Content-Type': 'application/json' },
         body : JSON.stringify({configuratoins : configData})
       })
-      .then(function(res){
-        return res.text();
-      })
-      .then(function(data){
-        console.log(data);
-      });
+      .then(function(res){ return res.text(); })
+      .then(function(data){ alert("Switch parameters uploaded to system flash."); });
     }
 
     function scanI2CBus() {
-      alert("Scanning I2C bus and verifying Chip IDs...");
+      fetch(`http://192.168.8.101/ScanIIC?scan=scan`)
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        if(data){
+          let Port_1 = document.getElementById("Port_1");
+          let Port_2 = document.getElementById("Port_2");
+          if (Port_1 && data.Bus_1) Port_1.innerHTML = data.Bus_1;
+          if (Port_2 && data.Bus_2) Port_2.innerHTML = data.Bus_2;
+        }
+      });
     }
+
+    // Polling I2C Sensor JSON Data
+    function GetI2C(){
+      fetch(`http://192.168.8.101/IIC_POST`)
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        if(data){
+          let Port_1 = document.getElementById("Port_1");
+          let Port_2 = document.getElementById("Port_2");
+
+          if (Port_1 && data.BUS_1) Port_1.innerHTML = data.BUS_1.type;
+          if (Port_2 && data.BUS_2) Port_2.innerHTML = data.BUS_2.type;
+
+          renderI2CSensorUI(data);
+        }
+      })
+      .catch(function(err) {
+        console.error("I2C Post fetch error:", err);
+      });
+    }
+
+    setInterval(GetI2C, 2000);
 
     function saveComms() {
       alert("UART & Modbus configurations saved.");
