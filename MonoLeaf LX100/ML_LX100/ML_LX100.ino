@@ -7,10 +7,13 @@
 #include <Preferences.h>
 #include <Wire.h>
 #include <Ticker.h>
+#include <ModbusMaster.h>
 
 WebServer server(80);
 Preferences pref;
-Ticker ReadI2Cticker;
+ModbusMaster node;
+Ticker ModbusTicker;
+
 
 const char* ssid = "Dialog 4G";
 const char* password = "N3GH5125L3M";
@@ -52,6 +55,12 @@ int SDA_1 = 16;
 int SCL_1 = 17;
 int SDA_2 = 18;
 int SCL_2 = 21;
+
+// RS485 MAX485
+int DE_RE = 40;
+
+int count = 0;
+int slaveID = 0;
 
 // I2C Bus device
 String Bus_1;
@@ -107,6 +116,11 @@ int sensorTypes[4] = {0,0,0,0};
 int LastSensorType[4] ={0,0,0,0};
 int LastSwitchType[4] ={0,0,0,0};
 
+int SlaveIdArray[10];
+int TempArray[10];
+int HumArray[10];
+String modbusJsonCache = "{}";
+
 int array_0[4] = {0,0,0,0};
 
 int LastChannelState[6];
@@ -126,10 +140,27 @@ int state_Array[6];
 int targetChannel_Array[6];
 int actionBuffer_Array[6];
 
+void enbaleTransmissoin(){
+  digitalWrite(DE_RE,HIGH);
+}
+
+void enableReading(){
+  digitalWrite(DE_RE,LOW);
+}
 
 void setup(){
 
+  pinMode(DE_RE,OUTPUT);
+  enableReading();
+
   Serial.begin(115200);
+  Serial1.begin(9600,SERIAL_8N1,39,38);
+
+  Serial1.setTimeout(400);
+
+  node.begin(1,Serial1);
+  node.preTransmission(enbaleTransmissoin);
+  node.postTransmission(enableReading);
 
   Wire.begin(SDA_1,SCL_1,100000);
   Wire1.begin(SDA_2,SCL_2,100000);
@@ -159,6 +190,10 @@ void setup(){
 
   GetExIo();
 
+  pref.begin("ModCount", true);
+  count = pref.getInt("Count", 0);
+  pref.end();
+
   Ch1_Buffer ? pinMode(Ch_1,INPUT_PULLUP) : pinMode(Ch_1, OUTPUT);
   Ch2_Buffer ? pinMode(Ch_2,INPUT_PULLUP) : pinMode(Ch_2, OUTPUT);
   Ch3_Buffer ? pinMode(Ch_3,INPUT_PULLUP) : pinMode(Ch_3, OUTPUT);
@@ -178,16 +213,34 @@ void setup(){
     ScanBus();
   }
 
+  //ModbusTicker.attach(2.0,Modbus);
+
   //ReadI2Cticker.attach(2.0,ReadI2C);
 }
+unsigned long lastModbusMillis = 0;
+const long modbusInterval = 5000;
+
+unsigned long lastIICMillis = 0;
+const long IICInterval = 2000;
 
 void loop(){
 
   server.handleClient();
   InbuiltSwitch();
   ExIoControl();
-  ReadData();
-  RunIIcAutomation();
+  RunModbusAutomation();
+
+  if (millis() - lastModbusMillis >= modbusInterval) {
+    lastModbusMillis = millis();
+    Modbus();
+  }
+
+  if(millis() - lastIICMillis >= IICInterval){
+    lastIICMillis = millis();
+    ReadData();
+    RunIIcAutomation();
+  }
+  
 }
 
 void InbuiltSwitch(){
@@ -281,7 +334,7 @@ void SoftAP(){
     if(gpio == 1) RelayOUT_1 = state , array_0[0] = state; 
     if(gpio == 2) RelayOUT_2 = state , array_0[1] = state;
     if(gpio == 4) RelayOUT_3 = state , array_0[2] = state;
-    if(gpio == 5) RelayOUT_4 = state , array_0[4] = state;
+    if(gpio == 5) RelayOUT_4 = state , array_0[3] = state;
 
     pref.begin("RelayStorage",false);
     RelayOUT_1 ? pref.putInt("R1",1) : pref.putInt("R1",0);
@@ -468,6 +521,32 @@ void SoftAP(){
   });
 
   server.on("/I2C_POST",HTTP_GET,sendI2Cdata);
+
+  server.on("/Modbus_new",HTTP_OPTIONS,[](){
+      server.sendHeader("Access-Control-Allow-Origin", "*");
+      server.sendHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+      server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+      server.send(204); // 204 No Content is the standard response for preflight    
+  });
+
+  server.on("/Modbus_new",HTTP_POST,GetModbusData);
+
+  server.on("/Modbus_Data",HTTP_OPTIONS,[](){
+      server.sendHeader("Access-Control-Allow-Origin", "*");
+      server.sendHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+      server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+      server.send(204);
+  });
+
+  server.on("/Modbus_Data",HTTP_GET,handleModbusRequest);
+
+  server.on("/modbus_automation",HTTP_OPTIONS,[](){
+      server.sendHeader("Access-Control-Allow-Origin", "*");
+      server.sendHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+      server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+      server.send(204);
+  });
+  server.on("/modbus_automation",HTTP_POST,GetModbusAutomation);
 
   server.begin();
 
@@ -932,11 +1011,11 @@ void RunIIcAutomation(){
   // BUS 1
   for(int i = 0; i < 4; i++){
     if(BUS_1_Condition == "above"){
-      if(BUS_1_relay == array_1[i] && BUS_1_thresh < thresh_1 and !array_0[i]){
+      if(BUS_1_relay == array_1[i] && BUS_1_thresh < thresh_1 && !array_0[i]){
         digitalWrite(array_1[i],HIGH);
         *RelayOUT[i] = HIGH;
       }
-      else if(BUS_1_relay == array_1[i] && BUS_1_thresh == thresh_1 and !array_0[i]){
+      else if(BUS_1_relay == array_1[i] && BUS_1_thresh == thresh_1 && !array_0[i]){
         digitalWrite(array_1[i],LOW);
         *RelayOUT[i] = LOW;
       }      
@@ -961,7 +1040,7 @@ void RunIIcAutomation(){
         digitalWrite(array_1[i],HIGH);
         *RelayOUT[i] = HIGH;
       }
-      else if(BUS_2_relay == array_1[i] && BUS_2_thresh < thresh_2 && !array_0[i]){
+      else if(BUS_2_relay == array_1[i] && BUS_2_thresh == thresh_2 && !array_0[i]){
         digitalWrite(array_1[i],LOW);
         *RelayOUT[i] = LOW;
       }
@@ -972,7 +1051,7 @@ void RunIIcAutomation(){
         digitalWrite(array_1[i],HIGH);
         *RelayOUT[i] = HIGH;
       }
-      else if(BUS_2_relay == array_1[i] && BUS_2_thresh > thresh_2 && !array_0[i]){
+      else if(BUS_2_relay == array_1[i] && BUS_2_thresh == thresh_2 && !array_0[i]){
         digitalWrite(array_1[i],LOW);
         *RelayOUT[i] = LOW;
       }
@@ -1014,4 +1093,136 @@ void sendI2Cdata(){
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.send(200,"application/json",JsonData);
 
+}
+
+void GetModbusData(){
+  String data = server.arg("new");
+  
+  if(data == "new"){
+    count += 1;
+    slaveID = count + 1;
+
+    node.begin(1,Serial1);
+
+    uint8_t result = node.writeSingleRegister(0x0101,slaveID);
+    Serial.println(slaveID);
+    Serial.println("Unpluged the sensor");
+
+    pref.begin("ModCount",false);
+    pref.putInt("Count",count);
+    pref.end();
+
+  }
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.send(200,"text/plain","ok");
+}
+
+void Modbus(){
+
+  uint8_t results;
+
+  JsonDocument doc;
+
+  for(int id = 2; id <= (count+1); id++){
+    node.begin(id,Serial1);
+    results = node.readInputRegisters(0x0001,2);
+
+    if(results == node.ku8MBSuccess){
+      uint16_t data_0 = node.getResponseBuffer(0) / 10.0;
+      uint16_t data_1 = node.getResponseBuffer(1) / 10.0;
+      
+      String idString = String(id);
+      JsonObject idData = doc[idString].to<JsonObject>();
+      idData["id"] = id;
+      idData["temp"] = data_0;
+      idData["hum"] = data_1;
+
+      //update arrays
+      SlaveIdArray[id] = id;
+      TempArray[id] = data_0;
+      HumArray[id] = data_1;
+
+      //Serial.println(TempArray[id]);
+    }
+    yield();
+  }
+    serializeJson(doc,modbusJsonCache);
+}
+
+void handleModbusRequest() {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.send(200, "application/json", modbusJsonCache);
+}
+
+void GetModbusAutomation(){
+
+  String data = server.arg("plain");
+
+  pref.begin("Modbus_auto",false);
+  pref.putString("auto_data",data);
+  pref.end();
+
+  //Serial.println(data);
+
+  RunModbusAutomation();
+
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.send(200,"text/plain","ok");
+
+
+
+}
+
+void RunModbusAutomation(){
+
+  pref.begin("Modbus_auto",true);
+  String savedJson = pref.getString("auto_data");
+  pref.end();
+
+  //Serial.println(savedJson);
+
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc,savedJson);
+
+  int array_1[4] = {1,2,4,5};
+  bool* RelayOUT[4] = {&RelayOUT_1,&RelayOUT_2,&RelayOUT_3,&RelayOUT_4};
+
+  JsonArray automation = doc["modbus_automations"];
+  for(JsonObject item : automation){
+    int sensorId = item["id"];
+    int relay = item["relay"];
+    int thresh = item["thresh"];
+    String metric = item["metric"];
+    String condition = item["cond"];
+
+    int currentTemp = TempArray[sensorId];
+    int currentHum = HumArray[sensorId];
+
+    for(int i = 0; i < 4; i++){
+      if(relay == array_1[i]){ // check relay and switch state of inbuilt 4 relays
+        if(condition == "above"){ // check condition
+          if(metric == "temp"){ // check metric
+            if(thresh < currentTemp  && !array_0[i]){ digitalWrite(array_1[i],HIGH); *RelayOUT[i] = HIGH; }
+            else if(thresh == currentTemp  && !array_0[i]){ digitalWrite(array_1[i],LOW); *RelayOUT[i] = LOW; }
+          }
+          else if(metric == "hum"){
+            if(thresh < currentHum  && !array_0[i]) { digitalWrite(array_1[i],HIGH); *RelayOUT[i] = HIGH; }
+            else if(thresh == currentHum  && !array_0[i]){digitalWrite(array_1[i],LOW); *RelayOUT[i] = LOW; }
+          }
+        }
+        else if(condition == "below"){
+          if(metric == "temp"){ // check metric
+            if(thresh > currentTemp && !array_0[i]){ digitalWrite(array_1[i],HIGH); *RelayOUT[i] = HIGH;}
+            else if(thresh == currentTemp  && !array_0[i]){ digitalWrite(array_1[i],LOW); *RelayOUT[i] = LOW;}
+          }
+          else if(metric == "hum"){
+            if(thresh < currentHum  && !array_0[i]) { digitalWrite(array_1[i],HIGH); *RelayOUT[i] = HIGH;}
+            else if(thresh == currentHum  && !array_0[i]){ digitalWrite(array_1[i],LOW); *RelayOUT[i] = LOW;}
+          }          
+        }
+        break;
+      }
+    }
+
+  }
 }
