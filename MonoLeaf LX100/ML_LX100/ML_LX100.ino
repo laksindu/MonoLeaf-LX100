@@ -141,7 +141,6 @@ int SlaveIdArray[10];
 int TempArray[10];
 int HumArray[10];
 String modbusJsonCache = "{}";
-
 int array_0[4] = {0,0,0,0};
 
 int LastChannelState[6];
@@ -160,6 +159,8 @@ int directionBuffer_Array[6];
 int state_Array[6];
 int targetChannel_Array[6];
 int actionBuffer_Array[6];
+
+char modbusJson_data[256]; // modbus data mqtt 
 
 void enbaleTransmissoin(){
   digitalWrite(DE_RE,HIGH);
@@ -263,6 +264,10 @@ void loop(){
   if (millis() - lastModbusMillis >= modbusInterval) {
     lastModbusMillis = millis();
     Modbus();
+    if(WiFi.status() == WL_CONNECTED){
+      MQTT_modbus_env(); // Modbus data transmission
+    }
+
   }
 
   if(millis() - lastIICMillis >= IICInterval){
@@ -270,7 +275,7 @@ void loop(){
     ReadData(); // I2C_Sensor.ino
 
     if(WiFi.status() == WL_CONNECTED){
-      MQTT_I2C_Sending();
+      MQTT_I2C_Sending(); // I2C mqtt transmission
     }
 
   }
@@ -369,6 +374,10 @@ void MQTT_I2C_Sending(){ // i2c env data (MQTT)
 void MQTT_I2C_Config(){ // i2c config data ( sending ) (MQTT)
   sendI2Cdata();
   client.publish("lx100/test/iic_config",I2cConfigBuffer);
+}
+
+void MQTT_modbus_env(){
+  client.publish("lx100/test/modbus_env",modbusJson_data);
 }
 
 void reconnect(){
@@ -1301,6 +1310,7 @@ void Modbus(){
     yield();
   }
     serializeJson(doc,modbusJsonCache);
+    serializeJson(doc,modbusJson_data);
 }
 
 void handleModbusRequest() {
