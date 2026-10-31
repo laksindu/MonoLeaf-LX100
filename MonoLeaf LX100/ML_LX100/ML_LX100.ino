@@ -79,6 +79,14 @@ int hum_bus_2;
 int air_bus_1;
 int air_bus_2;
 
+String I2cSendingJSON; // for http
+char I2csendingBuffer[256]; // for mqtt
+
+String I2cConfigJSON; // for http
+char I2cConfigBuffer[265];
+
+String GETi2cJsonAuto; // for http (get config)
+
 int Ch1_TCH;
 int Ch2_TCH;
 int Ch3_TCH;
@@ -250,6 +258,7 @@ void loop(){
   InbuiltSwitch();
   ExIoControl();
   RunModbusAutomation();
+  RunIIcAutomation();
 
   if (millis() - lastModbusMillis >= modbusInterval) {
     lastModbusMillis = millis();
@@ -258,8 +267,12 @@ void loop(){
 
   if(millis() - lastIICMillis >= IICInterval){
     lastIICMillis = millis();
-    ReadData();
-    RunIIcAutomation();
+    ReadData(); // I2C_Sensor.ino
+
+    if(WiFi.status() == WL_CONNECTED){
+      MQTT_I2C_Sending();
+    }
+
   }
 
   if(!client.connected()){
@@ -271,6 +284,8 @@ void loop(){
   else{
     client.loop();
   }
+
+
   
 }
 
@@ -316,11 +331,18 @@ void callback(char* topic, byte* payload, unsigned long lenght){
       MQTT_LAST_DIO();
     }
 
+    if(type == "IIC"){
+      GETi2cJsonAuto = JsonData;
+      I2Cautomation();
+      MQTT_I2C_Config();
+    }
+    
+
   }
 
 }
 
-void MQTT_Relays(){
+void MQTT_Relays(){ // relay states
 
   JsonDocument doc;
   doc["r_1"] = RelayOUT_1;
@@ -334,9 +356,19 @@ void MQTT_Relays(){
 
 }
 
-void MQTT_LAST_DIO(){
+void MQTT_LAST_DIO(){ // DIO states
   GetToggelEx();
   client.publish("lx100/test/DIO",ExIoBuffer);
+}
+
+void MQTT_I2C_Sending(){ // i2c env data (MQTT)
+  ReadI2C();
+  client.publish("lx100/test/iic_env",I2csendingBuffer);
+}
+
+void MQTT_I2C_Config(){ // i2c config data ( sending ) (MQTT)
+  sendI2Cdata();
+  client.publish("lx100/test/iic_config",I2cConfigBuffer);
 }
 
 void reconnect(){
@@ -349,6 +381,7 @@ void reconnect(){
       client.publish("lx100/test/pub","online");
       MQTT_Relays();
       MQTT_LAST_DIO();
+      MQTT_I2C_Config();
     }
     else{
       Serial.println("MQTT connection failed");
@@ -615,7 +648,7 @@ void SoftAP(){
     ESP.restart();
   });
 
-  server.on("/IIC_POST",HTTP_GET,ReadI2C);
+  server.on("/IIC_POST",HTTP_GET,HTTP_IIC_JSON);
 
   server.on("/i2c_automation",HTTP_OPTIONS,[](){
       server.sendHeader("Access-Control-Allow-Origin", "*");
@@ -624,7 +657,7 @@ void SoftAP(){
       server.send(204); // 204 No Content is the standard response for preflight    
   });
 
-  server.on("/i2c_automation",HTTP_POST,I2Cautomation);
+  server.on("/i2c_automation",HTTP_POST,I2Cautomation_config);
 
   server.on("/I2C_POST",HTTP_OPTIONS,[](){
       server.sendHeader("Access-Control-Allow-Origin", "*");
@@ -633,7 +666,7 @@ void SoftAP(){
       server.send(204); // 204 No Content is the standard response for preflight    
   });
 
-  server.on("/I2C_POST",HTTP_GET,sendI2Cdata);
+  server.on("/I2C_POST",HTTP_GET,I2cConfig_send);
 
   server.on("/Modbus_new",HTTP_OPTIONS,[](){
       server.sendHeader("Access-Control-Allow-Origin", "*");
@@ -1051,20 +1084,27 @@ void ReadI2C(){
     bus2obj["eco2"] = air_bus_2;
   }
 
-  String JsonString;
-  serializeJson(doc,JsonString);
+  serializeJson(doc,I2cSendingJSON);
+  serializeJson(doc,I2csendingBuffer);
 
   //Serial.println(JsonString);
-  
+}
+void HTTP_IIC_JSON(){ // i2c sensors env data (http)
+  ReadI2C();
   server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.send(200,"application/json",JsonString);
+  server.send(200,"application/json",I2cSendingJSON);
+}
+
+void I2Cautomation_config(){ // for http
+  GETi2cJsonAuto = server.arg("plain");
+  I2Cautomation();
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.send(200,"text/plain","ok");
 }
 
 void I2Cautomation(){
-  String JsonData = server.arg("plain");
-
   JsonDocument doc;
-  DeserializationError error = deserializeJson(doc,JsonData);
+  DeserializationError error = deserializeJson(doc,GETi2cJsonAuto);
 
   int BUS_1_relay = doc["b1_relay"];
   int BUS_1_thresh = doc["b1_thresh"];
@@ -1091,9 +1131,6 @@ void I2Cautomation(){
   pref.end();
 
   RunIIcAutomation();
-
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.send(200,"text/plain","ok");
 
 }
 
@@ -1202,12 +1239,14 @@ void sendI2Cdata(){
   BUS2obj["BUS_2_thresh"] = BUS_2_thresh;
   BUS2obj["BUS_2_Condition"] = BUS_2_Condition;
 
-  String JsonData;
-  serializeJson(doc,JsonData);
+  serializeJson(doc,I2cConfigJSON);
+  serializeJson(doc,I2cConfigBuffer);
+}
 
+void I2cConfig_send(){ // i2c config data send (http)
+  sendI2Cdata();
   server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.send(200,"application/json",JsonData);
-
+  server.send(200,"application/json",I2cConfigJSON);
 }
 
 void GetModbusData(){
