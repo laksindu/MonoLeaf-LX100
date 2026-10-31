@@ -445,6 +445,7 @@
   </main>
 
   <script>
+    
     // Mapping to store each bus's specific sensor category independently
     let sensorCategories = {};
 
@@ -520,7 +521,7 @@
 
     // Fetch automation config from ESP32 via HTTP GET
     function getAutomationConfig() {
-      fetch('http://192.168.8.100/I2C_POST')
+      fetch('http://192.168.8.104/I2C_POST')
         .then(function(res) { return res.json(); })
         .then(function(data) {
           if (!data) return;
@@ -596,7 +597,7 @@
       updateRelayControlIndicator();
       console.log("Sending Unified Automation JSON Payload:", payload);
 
-      fetch('http://192.168.8.100/i2c_automation', {
+      fetch('http://192.168.8.104/i2c_automation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -824,7 +825,7 @@
     }
 
     function getToggleExData() {
-      fetch('http://192.168.8.100/GetToggelEx')
+      fetch('http://192.168.8.104/GetToggelEx')
         .then(function(res) { return res.json(); })
         .then(function(data) {
           for (let ch = 1; ch <= 6; ch++) {
@@ -926,7 +927,7 @@
           var targetCh = reverseGpioMap[targetGpio];
           var action = actionSelect.value;
 
-          fetch('http://192.168.8.100/exio_target?source=' + ch + '&targetGpio=' + targetGpio + '&targetCh=' + targetCh + '&action=' + action)
+          fetch('http://192.168.8.104/exio_target?source=' + ch + '&targetGpio=' + targetGpio + '&targetCh=' + targetCh + '&action=' + action)
           .then(function(res) { return res.text(); })
           .catch(function(err) { console.error("Target config fetch error:", err); });
         }
@@ -937,7 +938,7 @@
       let val = state ? 1 : 0;
       let gpioPin = gpioMap[ch];
 
-      fetch('http://192.168.8.100/exio_toggle?ch=' + ch + '&gpio=' + gpioPin + '&state=' + val)
+      fetch('http://192.168.8.104/exio_toggle?ch=' + ch + '&gpio=' + gpioPin + '&state=' + val)
       .then(function(res) { return res.text(); })
       .catch(function(err) { console.error("ExIO toggle fetch error:", err); });
     }
@@ -962,7 +963,7 @@
         configData.push(item);
       }
       
-      fetch('http://192.168.8.100/ExIO', {
+      fetch('http://192.168.8.104/ExIO', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ configData: configData })
@@ -1038,13 +1039,13 @@
 
     function toggleRelay(id, state) {
       let val = state ? 1 : 0;
-      fetch('http://192.168.8.100/relay?id=' + id + '&state=' + val)
+      fetch('http://192.168.8.104/relay?id=' + id + '&state=' + val)
       .then(function(res){ return res.text(); })
       .then(function(data){ console.log("relay response: " + data); });
     }
 
     function getData() {
-      fetch('http://192.168.8.100/R_OUT')
+      fetch('http://192.168.8.104/R_OUT')
         .then(function(res) { return res.text(); })
         .then(function(data) {
           var states = data.trim().split(',');
@@ -1067,7 +1068,7 @@
     setInterval(getData, 1500);
 
     function getData_1() {
-      fetch('http://192.168.8.100/data')
+      fetch('http://192.168.8.104/data')
         .then(function(res) { return res.json(); })
         .then(function(data) {
           for (let i = 1; i <= 4; i++) {
@@ -1109,7 +1110,7 @@
         });
       }
 
-      fetch('http://192.168.8.100/Sconfig',{
+      fetch('http://192.168.8.104/Sconfig',{
         method: 'POST',
         headers:{ 'Content-Type': 'application/json' },
         body : JSON.stringify({configuratoins : configData})
@@ -1119,7 +1120,7 @@
     }
 
     function scanI2CBus() {
-      fetch(`http://192.168.8.100/ScanIIC?scan=scan`)
+      fetch(`http://192.168.8.104/ScanIIC?scan=scan`)
       .then(function(res){ return res.json(); })
       .then(function(data){
         if(data){
@@ -1133,7 +1134,7 @@
 
     // Polling I2C Sensor JSON Data
     function GetI2C(){
-      fetch(`http://192.168.8.100/IIC_POST`)
+      fetch(`http://192.168.8.104/IIC_POST`)
       .then(function(res){ return res.json(); })
       .then(function(data){
         if(data){
@@ -1154,7 +1155,7 @@
     setInterval(GetI2C, 2000);
 
     function saveComms() {
-      fetch(`http://192.168.8.100/Modbus_new`,{
+      fetch(`http://192.168.8.104/Modbus_new`,{
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -1229,7 +1230,7 @@
       let payload = { modbus_automations: automations };
       console.log("Sending Scalable Modbus Automation JSON Payload:", payload);
 
-      fetch('http://192.168.8.100/modbus_automation', {
+      fetch('http://192.168.8.104/modbus_automation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -1340,7 +1341,7 @@
     }
 
     function GetModbus(){
-      fetch(`http://192.168.8.100/Modbus_Data`)
+      fetch(`http://192.168.8.104/Modbus_Data`)
       .then(function(res){
         return res.json()
       })

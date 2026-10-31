@@ -8,15 +8,21 @@
 #include <Wire.h>
 #include <Ticker.h>
 #include <ModbusMaster.h>
+#include <PubSubClient.h>
 
 WebServer server(80);
 Preferences pref;
 ModbusMaster node;
 Ticker ModbusTicker;
 
+WiFiClient espclient;
+PubSubClient client(espclient);
 
 const char* ssid = "Dialog 4G";
 const char* password = "N3GH5125L3M";
+
+const char* mqtt_broker = "broker.emqx.io";
+const int mqtt_port = 1883;
 
 //relay pins
 int relay_1 = 1;
@@ -111,6 +117,13 @@ String SwitchType4;
 
 bool CheckState;
 
+//ExDIO var
+int IO_PIN;
+int IO_state;
+
+String ExIoJsonRes = "{}";
+char ExIoBuffer[256];
+
 String switchStates[4] = {"", "", "", ""};
 int sensorTypes[4] = {0,0,0,0};
 int LastSensorType[4] ={0,0,0,0};
@@ -185,6 +198,9 @@ void setup(){
     Serial.print(WiFi.localIP());
   }
 
+  client.setServer(mqtt_broker,mqtt_port);
+  client.setCallback(callback);
+
   SoftAP();
   GetData();
 
@@ -213,6 +229,8 @@ void setup(){
     ScanBus();
   }
 
+
+
   //ModbusTicker.attach(2.0,Modbus);
 
   //ReadI2Cticker.attach(2.0,ReadI2C);
@@ -222,6 +240,9 @@ const long modbusInterval = 5000;
 
 unsigned long lastIICMillis = 0;
 const long IICInterval = 2000;
+
+unsigned long lastReconnect = 0;
+const long retry = 5000;
 
 void loop(){
 
@@ -240,7 +261,100 @@ void loop(){
     ReadData();
     RunIIcAutomation();
   }
+
+  if(!client.connected()){
+    if(millis() - lastReconnect >= retry){
+      lastReconnect = millis();
+      reconnect();
+    }
+  }
+  else{
+    client.loop();
+  }
   
+}
+
+void callback(char* topic, byte* payload, unsigned long lenght){
+  String messagePayload;
+
+  for(int i = 0; i < lenght; i++){
+    messagePayload +=(char)payload[i];
+  }
+
+  String JsonData = messagePayload;
+  JsonDocument doc;
+  if(deserializeJson(doc,JsonData) == DeserializationError :: Ok){
+    String type = doc["type"];
+    int target_relay = doc["target_relay"];
+    int state = doc["state"];
+    String condition = doc["condition"];
+    String metric = doc["metric"];
+    int thresh = doc["thresh"];
+    int sensor_id = doc["sensor_id"];
+
+    if(type == "relay"){
+      bool* RelayOUT[4] = {&RelayOUT_1,&RelayOUT_2,&RelayOUT_3,&RelayOUT_4};
+      int relays[4] = {1,2,4,5};
+      *RelayOUT[target_relay -1] = state;
+      array_0[target_relay -1] = state;
+      digitalWrite(relays[target_relay -1],state);
+
+      pref.begin("RelayStorage",false);
+      RelayOUT_1 ? pref.putInt("R1",1) : pref.putInt("R1",0);
+      RelayOUT_2 ? pref.putInt("R2",1) : pref.putInt("R2",0);
+      RelayOUT_3 ? pref.putInt("R3",1) : pref.putInt("R3",0);
+      RelayOUT_4 ? pref.putInt("R4",1) : pref.putInt("R4",0);
+      pref.end();
+
+      MQTT_Relays();
+    }
+
+    if(type == "DIO"){
+      IO_PIN = doc["io_pin"];
+      IO_state = doc["state"];
+      ToggelExIO();
+      MQTT_LAST_DIO();
+    }
+
+  }
+
+}
+
+void MQTT_Relays(){
+
+  JsonDocument doc;
+  doc["r_1"] = RelayOUT_1;
+  doc["r_2"] = RelayOUT_2;
+  doc["r_3"] = RelayOUT_3;
+  doc["r_4"] = RelayOUT_4;
+
+  char buffer[256];
+  serializeJson(doc,buffer);
+  client.publish("lx100/test/relays",buffer);
+
+}
+
+void MQTT_LAST_DIO(){
+  GetToggelEx();
+  client.publish("lx100/test/DIO",ExIoBuffer);
+}
+
+void reconnect(){
+  while(!client.connected()){
+    Serial.println("MQTT connecting");
+
+    if(client.connect("lx100")){
+      Serial.println("MQTT connected");
+      client.subscribe("lx100/test/sub");
+      client.publish("lx100/test/pub","online");
+      MQTT_Relays();
+      MQTT_LAST_DIO();
+    }
+    else{
+      Serial.println("MQTT connection failed");
+      delay(5000);
+    }
+  }
 }
 
 void InbuiltSwitch(){
@@ -433,12 +547,11 @@ void SoftAP(){
     //server.send(200,"text/plain","OK");
      if (shouldRestart) {
         server.send(200, "text/plain", "OK. Restarting ESP...");
-        delay(1000); // 1-second delay lets the Wi-Fi chip finish sending the "OK" reply
+        delay(1000); // 1 second delay Wi-Fi chip finish sending the "OK" reply
         ESP.restart();
     } else {
         server.send(400, "text/plain", "Error: Invalid JSON or empty configuration");
-    }
-
+    } 
   });
 
   server.on("/data", HTTP_GET, handleSendData);
@@ -459,9 +572,9 @@ void SoftAP(){
 
   server.on("/ExIO",HTTP_POST,ExIO);
 
-  server.on("/exio_toggle", HTTP_GET,ToggelExIO);
+  server.on("/exio_toggle", HTTP_GET,HTTP_ToggelExIO);
 
-  server.on("/GetToggelEx",HTTP_GET,GetToggelEx);
+  server.on("/GetToggelEx",HTTP_GET,HTTP_ExIoResSend);
 
   server.on("/ScanIIC",HTTP_OPTIONS,[](){
       server.sendHeader("Access-Control-Allow-Origin", "*");
@@ -780,38 +893,37 @@ void ExIoControl(){
 
 }
 
-void ToggelExIO(){
+
+
+void HTTP_ToggelExIO(){
 
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.sendHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
   server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  String GPIO = server.arg("gpio");
-  String State = server.arg("state");
+  IO_PIN = server.arg("gpio").toInt();
+  IO_state = server.arg("state").toInt();
 
-  int gpio_int = GPIO.toInt();
-  int state_int = State.toInt();
+  ToggelExIO();
 
-  digitalWrite(gpio_int,state_int);
-
-  pref.begin("Storage_1",false);
-  if(gpio_int == 10) pref.putInt("Ch_1",state_int);
-  if(gpio_int == 11) pref.putInt("Ch_2",state_int);
-  if(gpio_int == 12) pref.putInt("Ch_3",state_int);
-  if(gpio_int == 13) pref.putInt("Ch_4",state_int);
-  if(gpio_int == 14) pref.putInt("Ch_5",state_int);
-  if(gpio_int == 15) pref.putInt("Ch_6",state_int);
-  pref.end();
-
-  //Serial.println(gpio_int);
-  //Serial.println(state_int);
-  
   server.send(200,"text/plain","Ok");
 }
 
-void GetToggelEx(){
+void ToggelExIO(){
 
-  server.sendHeader("Access-Control-Allow-Origin", "*");
+  digitalWrite(IO_PIN,IO_state);
+
+  pref.begin("Storage_1",false);
+  if(IO_PIN == 10) pref.putInt("Ch_1",IO_state);
+  if(IO_PIN == 11) pref.putInt("Ch_2",IO_state);
+  if(IO_PIN == 12) pref.putInt("Ch_3",IO_state);
+  if(IO_PIN == 13) pref.putInt("Ch_4",IO_state);
+  if(IO_PIN == 14) pref.putInt("Ch_5",IO_state);
+  if(IO_PIN == 15) pref.putInt("Ch_6",IO_state);
+  pref.end();
+}
+
+void GetToggelEx(){
 
   pref.begin("Storage_1",true);
   int Ch1_Get = pref.getInt("Ch_1");
@@ -867,11 +979,14 @@ void GetToggelEx(){
     arrAC.add(LastChannelAC[i]);
   }
 
-  String jsonResponse;
-  serializeJson(doc,jsonResponse);
+  serializeJson(doc,ExIoJsonRes);
+  serializeJson(doc,ExIoBuffer);
+}
 
-  server.send(200,"application/json",jsonResponse);
-
+void HTTP_ExIoResSend(){
+  GetToggelEx();
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.send(200,"application/json",ExIoJsonRes);
 }
 
 void ReadI2C(){
